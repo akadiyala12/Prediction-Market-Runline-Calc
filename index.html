@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Synthetic Run Line</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single working column; setup card (line type, platform, amounts), wager table, summary strip, outcome check. */
+:root{
+  --bg:#F3F5F1; --surface:#FFFFFF; --fg:#17201B; --muted:#5E6B63; --line:#D9E0DA;
+  --accent:#1E6B47; --accent-soft:#E2EFE7; --win:#1E6B47; --push:#6B6F2A; --loss:#B2462A; --warn-bg:#FBEDE7;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1411; --surface:#171E1A; --fg:#E4EAE6; --muted:#93A099; --line:#2A342E;
+  --accent:#5DBE8C; --accent-soft:#1D2E25; --win:#5DBE8C; --push:#C4C46A; --loss:#E58A6C; --warn-bg:#2E1E18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1411; --surface:#171E1A; --fg:#E4EAE6; --muted:#93A099; --line:#2A342E;
+  --accent:#5DBE8C; --accent-soft:#1D2E25; --win:#5DBE8C; --push:#C4C46A; --loss:#E58A6C; --warn-bg:#2E1E18; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:20px}
+header h1{font-family:var(--display);font-weight:700;font-size:2.1rem;line-height:1.05;margin:0;letter-spacing:.01em;text-wrap:balance}
+header p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.label{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:.82rem;color:var(--muted);margin:0 0 10px}
+.block+.block{margin-top:18px;padding-top:18px;border-top:1px dashed var(--line)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:520px){.grid{grid-template-columns:minmax(0,1fr)}}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:.85rem;font-weight:500}
+.hint{font-size:.76rem;color:var(--muted)}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:7px;background:var(--bg);overflow:hidden}
+.inp:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.inp input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font-family:var(--mono);font-size:1rem;padding:9px 10px}
+.inp input:focus{outline:none}
+.inp span{font-family:var(--mono);color:var(--muted);padding:0 10px;font-size:.9rem}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:7px;overflow:hidden;max-width:100%}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 .85rem var(--body);padding:8px 13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.types{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.types{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.types button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:9px 8px;cursor:pointer;text-align:left;font:inherit}
+.types button b{display:block;font-family:var(--display);font-weight:700;font-size:1.15rem;line-height:1.1}
+.types button small{color:var(--muted);font-size:.74rem}
+.types button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.types button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.stack{display:flex;flex-direction:column;gap:10px}
+
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right}
+td.n{font-family:var(--mono)}
+td.big{font-family:var(--display);font-weight:700;font-size:1.35rem;color:var(--accent)}
+tfoot td{border-bottom:0;font-weight:600}
+.tag{font-family:var(--display);font-weight:600;letter-spacing:.04em;font-size:.85rem;background:var(--accent-soft);color:var(--accent);padding:2px 7px;border-radius:4px}
+.sub{font-size:.74rem;color:var(--muted);font-family:var(--mono)}
+
+.headline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:520px){.headline{grid-template-columns:minmax(0,1fr)}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.stat.main{background:var(--accent-soft);border-color:transparent}
+.stat .k{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.stat .v{font-family:var(--display);font-weight:700;font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat .s{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+
+.pill{display:inline-block;font-family:var(--display);font-weight:600;letter-spacing:.04em;font-size:.85rem;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+.w{color:var(--win)}.p{color:var(--push)}.l{color:var(--loss)}
+.warn{background:var(--warn-bg);color:var(--loss);border-radius:8px;padding:10px 12px;font-size:.88rem}
+details summary{cursor:pointer;font-weight:600}
+details p{max-width:65ch;color:var(--muted);font-size:.9rem}
+code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Synthetic Whole-Number Line</h1>
+    <p>Split one bet across two half-point markets so landing exactly on the whole number pushes. Prices are prediction-market odds in cents.</p>
+  </header>
+
+  <section class="card" aria-label="Setup">
+    <div class="block">
+      <h2 class="label">Line to create</h2>
+      <div class="types" role="group" aria-label="Line type">
+        <button type="button" data-t="fav" aria-pressed="true"><b>Favorite −</b><small>Run line, laying runs</small></button>
+        <button type="button" data-t="dog" aria-pressed="false"><b>Underdog +</b><small>Run line, getting runs</small></button>
+        <button type="button" data-t="over" aria-pressed="false"><b>Over</b><small>Game total</small></button>
+        <button type="button" data-t="under" aria-pressed="false"><b>Under</b><small>Game total</small></button>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div class="field"><label for="k" id="k-l">Whole number</label>
+          <div class="inp"><input id="k" type="number" inputmode="numeric" step="1" min="1" value="1"></div>
+          <div class="hint" id="k-h"></div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2 class="label">Platform fees</h2>
+      <div class="stack">
+        <div class="seg" role="group" aria-label="Platform">
+          <button type="button" data-f="poly" aria-pressed="true">Polymarket</button>
+          <button type="button" data-f="kalshi" aria-pressed="false">Kalshi</button>
+          <button type="button" data-f="none" aria-pressed="false">No fees</button>
+        </div>
+        <div class="grid" id="f-rate">
+          <div class="field"><label for="rate">Taker fee rate</label>
+            <div class="inp"><input id="rate" type="number" inputmode="decimal" step="0.5" min="0" value="5"><span>%</span></div>
+            <div class="hint" id="rate-h"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2 class="label">Amount</h2>
+      <div class="stack">
+        <div class="seg" role="group" aria-label="Amount type">
+          <button type="button" id="m-win" aria-pressed="true">To Win Amount</button>
+          <button type="button" id="m-risk" aria-pressed="false">To Risk Amount</button>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="amt" id="amt-l">Amount to win</label>
+            <div class="inp"><span>$</span><input id="amt" type="number" inputmode="decimal" step="1" min="0" value="100"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2 class="label">Odds (YES price you pay)</h2>
+      <div class="grid">
+        <div class="field"><label for="p" id="p-l">Moneyline</label>
+          <div class="inp"><input id="p" type="number" inputmode="decimal" step="0.1" min="1" max="99" value="60"><span>¢</span></div>
+          <div class="hint" id="p-h"></div></div>
+        <div class="field"><label for="q" id="q-l">−1.5</label>
+          <div class="inp"><input id="q" type="number" inputmode="decimal" step="0.1" min="1" max="99" value="43.5"><span>¢</span></div>
+          <div class="hint" id="q-h"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="warn" class="warn" hidden></div>
+
+  <section class="card" aria-labelledby="w-h">
+    <h2 class="label" id="w-h">Wagers</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>Bet</th><th class="n">Odds</th><th class="n">To risk</th><th class="n">To win</th></tr></thead>
+      <tbody id="wagers"></tbody>
+      <tfoot id="wtot"></tfoot>
+    </table></div>
+  </section>
+
+  <section class="headline" aria-label="Summary">
+    <div class="stat main"><div class="k" id="o-line-k">Odds on created line</div><div class="v" id="o-line">—</div><div class="s" id="o-line-s"></div></div>
+    <div class="stat"><div class="k">Total risk</div><div class="v" id="o-risk">—</div><div class="s">Including fees</div></div>
+    <div class="stat"><div class="k">Total winnings</div><div class="v" id="o-win">—</div><div class="s" id="o-win-s"></div></div>
+  </section>
+
+  <section class="card" aria-labelledby="sc-h">
+    <h2 class="label" id="sc-h">Check every result</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Result</th><th class="n" id="h1">Wager 1</th><th class="n" id="h2">Wager 2</th><th class="n">Net</th></tr></thead>
+      <tbody id="sc"></tbody>
+    </table></div>
+  </section>
+
+  <details class="card">
+    <summary>How the split and fees work</summary>
+    <p>Wager 1 is the wider market (it also wins when the result lands exactly on the number). Wager 2 is the narrower one. To risk <code>R</code>, put <code>R·p</code> on wager 1 and <code>R·(1−p)</code> on wager 2. Landing on the number pays exactly <code>R</code> back, a push. The created line is priced at <code>q / (q + 1 − p)</code>.</p>
+    <p>Both platforms charge takers <code>rate × contracts × price × (1 − price)</code>. Polymarket takes the fee out of the shares you receive, which is why your payout came in under the full amount. That works out to an effective price of <code>p / (1 − rate·(1−p))</code>. Kalshi adds the fee to your cost, an effective price of <code>p·(1 + rate·(1−p))</code>, and rounds each order's fee up to the cent. The calculator uses these effective prices so the push still breaks even after fees. Resting limit orders that get filled (maker orders) usually pay no fee on either platform.</p>
+  </details>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const S={type:"fav",fee:"poly",mode:"win"};
+  const RATES={poly:5,kalshi:7,none:0};
+  const num=id=>{const v=parseFloat($(id).value);return isFinite(v)?v:NaN};
+  const money=x=>{if(Math.abs(x)<0.005)x=0;return (x<0?"−$":"$")+Math.abs(x).toFixed(2)};
+  const signed=x=>(x>=0.005?"+":"")+money(x);
+  const amer=P=>{if(!(P>0&&P<1))return"—";const a=P>=.5?-100*P/(1-P):100*(1-P)/P;return (a>0?"+":"−")+Math.abs(Math.round(a))};
+  const cents=P=>(P*100).toFixed(1)+"¢";
+  const h=k=>(k-0.5).toFixed(1), H=k=>(k+0.5).toFixed(1);
+
+  function legs(k){
+    switch(S.type){
+      case "fav": return {
+        line:"−"+k, l1:k===1?"Moneyline":"−"+h(k), l2:"−"+H(k), pd:60, qd:43.5,
+        rows:[`Win by ${k+1}+`,`Win by exactly ${k}`,k===1?"Lose":`Win by less than ${k}, or lose`]};
+      case "dog": return {
+        line:"+"+k, l1:"+"+H(k), l2:k===1?"Moneyline":"+"+h(k), pd:56.5, qd:40,
+        rows:[k===1?"Win":`Win, or lose by less than ${k}`,`Lose by exactly ${k}`,`Lose by ${k+1}+`]};
+      case "over": return {
+        line:"Over "+k, l1:"Over "+h(k), l2:"Over "+H(k), pd:58, qd:47,
+        rows:[`${k+1} or more`,`Exactly ${k}`,`${k-1} or fewer`]};
+      case "under": return {
+        line:"Under "+k, l1:"Under "+H(k), l2:"Under "+h(k), pd:53, qd:42,
+        rows:[`${k-1} or fewer`,`Exactly ${k}`,`${k+1} or more`]};
+    }
+  }
+  function effPrice(P,r){
+    if(S.fee==="poly")return P/(1-r*(1-P));
+    if(S.fee==="kalshi")return P*(1+r*(1-P));
+    return P;
+  }
+
+  function render(){
+    const k=Math.max(1,Math.round(num("k")||1));
+    const L=legs(k);
+    $("p-l").textContent=L.l1; $("q-l").textContent=L.l2;
+    $("h1").textContent=L.l1; $("h2").textContent=L.l2;
+    $("k-h").textContent="Creates "+L.line;
+    $("o-line-k").textContent="Odds on created "+L.line;
+
+    const p=num("p")/100,q=num("q")/100,A=num("amt");
+    const r=S.fee==="none"?0:(num("rate")||0)/100;
+    $("p-h").textContent=p>0&&p<1?amer(p)+" American":"";
+    $("q-h").textContent=q>0&&q<1?amer(q)+" American":"";
+    const w=$("warn");w.hidden=true;
+    if(!(p>0&&p<1&&q>0&&q<1)){w.textContent="Enter both odds between 1¢ and 99¢.";w.hidden=false;return}
+    if(!(A>0)){w.textContent="Enter an amount above $0.";w.hidden=false;return}
+    if(S.fee==="poly"&&r*(1-p)>=1){w.textContent="That fee rate is too high to calculate.";w.hidden=false;return}
+    if(q>=p){w.textContent=`${L.l2} is priced at or above ${L.l1}. The narrower market can't be likelier than the wider one, so one of the quotes is off.`;w.hidden=false}
+
+    const pe=effPrice(p,r),qe=effPrice(q,r);
+    if(!(pe<1&&qe<1)){w.textContent="After fees a price reaches 100¢, so there's nothing to win.";w.hidden=false;return}
+
+    const R=S.mode==="risk"?A:A*qe/(1-pe);
+    const W=R*(1-pe)/qe;
+    const s1=R*pe,s2=R*(1-pe);
+    const c1=s1/pe,c2=s2/qe;               // contracts that pay $1 each
+    const fee=(s,P,Pe)=>s*(1-P/Pe);         // fee in dollars, either platform
+    const f1=fee(s1,p,pe),f2=fee(s2,q,qe);
+    const w1=c1-s1,w2=c2-s2;
+
+    const feeNote=f=>S.fee==="none"?"":`<div class="sub">${money(f)} fee</div>`;
+    $("wagers").innerHTML=
+      `<tr><td>1</td><td><span class="tag">${L.l1}</span></td><td class="n">${cents(p)}</td><td class="n big">${money(s1)}${feeNote(f1)}</td><td class="n">${money(w1)}<div class="sub">${c1.toFixed(1)} contracts</div></td></tr>`+
+      `<tr><td>2</td><td><span class="tag">${L.l2}</span></td><td class="n">${cents(q)}</td><td class="n big">${money(s2)}${feeNote(f2)}</td><td class="n">${money(w2)}<div class="sub">${c2.toFixed(1)} contracts</div></td></tr>`;
+    $("wtot").innerHTML=`<tr><td></td><td>Total</td><td></td><td class="n">${money(R)}${S.fee==="none"?"":`<div class="sub">${money(f1+f2)} in fees</div>`}</td><td class="n"></td></tr>`;
+
+    const line=qe/(qe+1-pe), raw=q/(q+1-p);
+    $("o-line").textContent=cents(line);
+    $("o-line-s").textContent=amer(line)+" American"+(S.fee==="none"?"":` · ${cents(raw)} before fees`);
+    $("o-risk").textContent=money(R);
+    $("o-win").textContent=money(W);
+    $("o-win-s").textContent="If it lands "+(S.type==="fav"||S.type==="over"?"above":S.type==="dog"?"inside":"below")+" the number";
+
+    const rows=[[L.rows[0],"w",w1,w2],[L.rows[1],"p",w1,-s2],[L.rows[2],"l",-s1,-s2]];
+    $("sc").innerHTML=rows.map(x=>{const net=x[2]+x[3];const c=net>0.005?"w":net<-0.005?"l":"p";
+      return `<tr><td><span class="pill ${x[1]}">${x[0]}</span></td><td class="n">${signed(x[2])}</td><td class="n">${signed(x[3])}</td><td class="n ${c}">${signed(net)}</td></tr>`}).join("");
+  }
+
+  function setRateHint(){
+    $("f-rate").hidden=S.fee==="none";
+    $("rate-h").textContent=S.fee==="poly"
+      ?"5% for most sports. NFL and college football game markets use 3%. Fee comes out of your shares."
+      :"7% default. Some sports series, including some MLB markets, use a 0.5 multiplier (3.5%). Rounded up per order.";
+  }
+  document.querySelectorAll(".types button").forEach(b=>b.addEventListener("click",()=>{
+    S.type=b.dataset.t;
+    document.querySelectorAll(".types button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+    $("k").value=(S.type==="over"||S.type==="under")?8:1;
+    const L=legs(Math.round(num("k")));$("p").value=L.pd;$("q").value=L.qd;
+    $("k-l").textContent=(S.type==="over"||S.type==="under")?"Total (whole number)":"Runs (whole number)";
+    render();
+  }));
+  document.querySelectorAll("[data-f]").forEach(b=>b.addEventListener("click",()=>{
+    S.fee=b.dataset.f;
+    document.querySelectorAll("[data-f]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+    if(S.fee!=="none")$("rate").value=RATES[S.fee];
+    setRateHint();render();
+  }));
+  const setMode=m=>{S.mode=m;$("m-win").setAttribute("aria-pressed",m==="win");$("m-risk").setAttribute("aria-pressed",m==="risk");
+    $("amt-l").textContent=m==="win"?"Amount to win":"Amount to risk";render()};
+  $("m-win").addEventListener("click",()=>setMode("win"));
+  $("m-risk").addEventListener("click",()=>setMode("risk"));
+  document.querySelectorAll("input").forEach(i=>i.addEventListener("input",render));
+  $("k-l").textContent="Runs (whole number)";
+  setRateHint();render();
+})();
+</script>
+
+</body>
+</html>
