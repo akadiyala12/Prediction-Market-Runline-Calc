@@ -79,6 +79,19 @@ tfoot td{border-bottom:0;font-weight:600}
 .pill{display:inline-block;font-family:var(--display);font-weight:600;letter-spacing:.04em;font-size:.85rem;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
 .w{color:var(--win)}.p{color:var(--push)}.l{color:var(--loss)}
 .warn{background:var(--warn-bg);color:var(--loss);border-radius:8px;padding:10px 12px;font-size:.88rem}
+.plats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+@media (max-width:600px){.plats{grid-template-columns:minmax(0,1fr)}}
+.plat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;background:var(--bg)}
+.plat.best{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.plat h3{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--display);font-weight:700;font-size:1.15rem;letter-spacing:.03em}
+.plat h3 small{font-size:.75rem;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+.plat .k{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-top:6px}
+.plat .bet{font-family:var(--display);font-weight:700;font-size:2rem;color:var(--accent);line-height:1.1;font-variant-numeric:tabular-nums}
+.plat .act{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin:2px 0 10px}
+.plat dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;font-size:.85rem}
+.plat dt{color:var(--muted)}
+.plat dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.note{color:var(--muted);font-size:.84rem;margin:14px 0 0;max-width:65ch}
 details summary{cursor:pointer;font-weight:600}
 details p{max-width:65ch;color:var(--muted);font-size:.9rem}
 code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);padding:1px 5px;border-radius:4px}
@@ -176,6 +189,27 @@ code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);paddi
     </table></div>
   </section>
 
+  <section class="card" aria-labelledby="sb-h">
+    <h2 class="label" id="sb-h">Single bet with fees</h2>
+    <p class="note" style="margin:-4px 0 14px">How much to bet on one market so you win your target amount after fees.</p>
+    <div class="grid">
+      <div class="field"><label for="sbp">Price (YES you pay)</label>
+        <div class="inp"><input id="sbp" type="number" inputmode="decimal" step="1" min="1" max="99" value="60"><span>¢</span></div>
+        <div class="hint" id="sbp-h"></div></div>
+      <div class="field"><label for="sbw">Amount to win (after fees)</label>
+        <div class="inp"><span>$</span><input id="sbw" type="number" inputmode="decimal" step="1" min="0" value="100"></div></div>
+      <div class="field"><label for="sbpr">Polymarket fee rate</label>
+        <div class="inp"><input id="sbpr" type="number" inputmode="decimal" step="0.5" min="0" value="5"><span>%</span></div>
+        <div class="hint">5% most sports, 3% NFL and college football games</div></div>
+      <div class="field"><label for="sbkr">Kalshi fee rate</label>
+        <div class="inp"><input id="sbkr" type="number" inputmode="decimal" step="0.5" min="0" value="7"><span>%</span></div>
+        <div class="hint">7% default, 3.5% on some MLB series</div></div>
+    </div>
+    <div id="sb-warn" class="warn" style="margin-top:14px" hidden></div>
+    <div class="plats" id="sb-out"></div>
+    <p class="note">Polymarket takes its fee out of the shares you receive, so you get fewer than $1 per dollar of payout you'd expect. Kalshi adds the fee to your cost, rounds it up to the cent, and only sells whole contracts, so your profit can land a few cents above the target.</p>
+  </section>
+
   <details class="card">
     <summary>How the split and fees work</summary>
     <p>Wager 1 is the wider market (it also wins when the result lands exactly on the number). Wager 2 is the narrower one. To risk <code>R</code>, put <code>R·p</code> on wager 1 and <code>R·(1−p)</code> on wager 2. Landing on the number pays exactly <code>R</code> back, a push. The created line is priced at <code>q / (q + 1 − p)</code>.</p>
@@ -238,18 +272,42 @@ code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);paddi
     const pe=effPrice(p,r),qe=effPrice(q,r);
     if(!(pe<1&&qe<1)){w.textContent="After fees a price reaches 100¢, so there's nothing to win.";w.hidden=false;return}
 
-    const R=S.mode==="risk"?A:A*qe/(1-pe);
-    const W=R*(1-pe)/qe;
-    const s1=R*pe,s2=R*(1-pe);
-    const c1=s1/pe,c2=s2/qe;               // contracts that pay $1 each
+    let R=S.mode==="risk"?A:A*qe/(1-pe);
+    let W=R*(1-pe)/qe;
+    let s1=R*pe,s2=R*(1-pe);
+    let c1=s1/pe,c2=s2/qe;                 // contracts that pay $1 each
     const fee=(s,P,Pe)=>s*(1-P/Pe);         // fee in dollars, either platform
-    const f1=fee(s1,p,pe),f2=fee(s2,q,qe);
-    const w1=c1-s1,w2=c2-s2;
+    let f1=fee(s1,p,pe),f2=fee(s2,q,qe);
+    let w1=c1-s1,w2=c2-s2;
+
+    // Kalshi sells whole contracts and rounds each order's fee up to the cent,
+    // so solve in whole contracts: wager 1's payout must cover both costs (push >= $0).
+    if(S.fee==="kalshi"){
+      const kfee=(C,P)=>Math.ceil(Math.round(r*C*P*(1-P)*1e6)/1e4-1e-9)/100;
+      const kcost=(C,P)=>Math.round(C*P*100)/100+kfee(C,P);
+      const solve=C2=>{
+        const k2=kcost(C2,q);
+        let C1=Math.max(1,Math.floor(k2/(1-pe))-3);
+        while(C1-kcost(C1,p)-k2< -1e-9)C1++;
+        const k1=kcost(C1,p),tot=k1+k2;
+        return{C1,C2,k1,k2,tot,win:C1+C2-tot};
+      };
+      let C2=Math.max(1,Math.round(c2)-3),best=null;
+      for(let i=0;i<2000;i++,C2++){
+        const t=solve(C2);
+        if(S.mode==="win"){if(t.win>=A-1e-9){best=t;break}}
+        else{if(t.tot<=A+1e-9)best=t;else break}
+      }
+      if(!best)best=solve(Math.max(1,Math.round(c2)));
+      c1=best.C1;c2=best.C2;s1=best.k1;s2=best.k2;
+      f1=kfee(c1,p);f2=kfee(c2,q);
+      R=best.tot;W=best.win;w1=c1-s1;w2=c2-s2;
+    }
 
     const feeNote=f=>S.fee==="none"?"":`<div class="sub">${money(f)} fee</div>`;
     $("wagers").innerHTML=
-      `<tr><td>1</td><td><span class="tag">${L.l1}</span></td><td class="n">${cents(p)}</td><td class="n big">${money(s1)}${feeNote(f1)}</td><td class="n">${money(w1)}<div class="sub">${c1.toFixed(1)} contracts</div></td></tr>`+
-      `<tr><td>2</td><td><span class="tag">${L.l2}</span></td><td class="n">${cents(q)}</td><td class="n big">${money(s2)}${feeNote(f2)}</td><td class="n">${money(w2)}<div class="sub">${c2.toFixed(1)} contracts</div></td></tr>`;
+      `<tr><td>1</td><td><span class="tag">${L.l1}</span></td><td class="n">${cents(p)}</td><td class="n big">${money(s1)}${feeNote(f1)}</td><td class="n">${money(w1)}<div class="sub">${c1.toFixed(S.fee==="kalshi"?0:1)} contracts</div></td></tr>`+
+      `<tr><td>2</td><td><span class="tag">${L.l2}</span></td><td class="n">${cents(q)}</td><td class="n big">${money(s2)}${feeNote(f2)}</td><td class="n">${money(w2)}<div class="sub">${c2.toFixed(S.fee==="kalshi"?0:1)} contracts</div></td></tr>`;
     $("wtot").innerHTML=`<tr><td></td><td>Total</td><td></td><td class="n">${money(R)}${S.fee==="none"?"":`<div class="sub">${money(f1+f2)} in fees</div>`}</td><td class="n"></td></tr>`;
 
     const line=qe/(qe+1-pe), raw=q/(q+1-p);
@@ -284,13 +342,58 @@ code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);paddi
     if(S.fee!=="none")$("rate").value=RATES[S.fee];
     setRateHint();render();
   }));
+  function renderSingle(){
+    const pc=num("sbp"),W=num("sbw"),rp=(num("sbpr")||0)/100,rk=(num("sbkr")||0)/100;
+    const p=pc/100,warn=$("sb-warn"),out=$("sb-out");warn.hidden=true;
+    $("sbp-h").textContent=p>0&&p<1?amer(p)+" American":"";
+    const fail=t=>{warn.textContent=t;warn.hidden=false;out.innerHTML=""};
+    if(!(p>0&&p<1))return fail("Enter a price between 1¢ and 99¢.");
+    if(!(W>0))return fail("Enter an amount to win above $0.");
+
+    // Polymarket: fee = rate × shares × p × (1−p), taken out of the shares you receive
+    let poly=null;const keep=1-rp*(1-p);
+    if(keep>0&&p/keep<1){
+      const pe=p/keep;
+      const S=Math.ceil(W*pe/(1-pe)*100-1e-9)/100;
+      const gross=S/p,feeSh=gross*rp*(1-p),net=gross-feeSh;
+      poly={bet:S,act:`Spend ${money(S)} on YES at ${pc}¢`,fee:feeSh*p,feeNote:`${feeSh.toFixed(2)} shares`,units:`${net.toFixed(2)} shares`,payout:net,profit:net-S,eff:S/net};
+    }
+
+    // Kalshi: fee = ceil(rate × C × p × (1−p)) to the cent, added to cost; whole contracts
+    let kal=null;const marginC=100-pc-rk*pc*(100-pc)/100;
+    if(marginC>0){
+      let C=Math.max(1,Math.floor(W*100/marginC));
+      for(let i=0;i<1000;i++,C++){
+        const costC=C*pc,feeC=Math.ceil(rk*C*pc*(100-pc)/100-1e-9);
+        const profC=C*100-costC-feeC;
+        if(profC>=W*100-1e-6){kal={bet:(costC+feeC)/100,act:`Buy ${C} contracts at ${pc}¢`,fee:feeC/100,feeNote:"added to cost",units:`${C} contracts`,payout:C,profit:profC/100,eff:(costC+feeC)/100/C};break}
+      }
+    }
+
+    const S0=Math.ceil(W*p/(1-p)*100-1e-9)/100;
+    const none={bet:S0,act:`Bet ${money(S0)} at ${pc}¢`,fee:0,feeNote:"",units:`${(S0/p).toFixed(2)} contracts`,payout:S0/p,profit:S0/p-S0,eff:p};
+
+    const best=poly&&kal?(poly.bet<=kal.bet?"poly":"kal"):null;
+    const card=(name,d,key)=>{
+      if(!d)return `<div class="plat"><h3>${name}</h3><p class="note">Fees are higher than the payout at this price, so there's nothing to win.</p></div>`;
+      return `<div class="plat${best===key?" best":""}"><h3>${name}${best===key?"<small>Cheaper</small>":""}</h3>
+        <div class="k">Bet</div><div class="bet">${money(d.bet)}</div><div class="act">${d.act}</div>
+        <dl><dt>Fee</dt><dd>${money(d.fee)}</dd>
+        <dt>You hold</dt><dd>${d.units}</dd>
+        <dt>Payout if it wins</dt><dd>${money(d.payout)}</dd>
+        <dt>Profit</dt><dd class="w">${signed(d.profit)}</dd>
+        <dt>Effective odds</dt><dd>${cents(d.eff)} · ${amer(d.eff)}</dd></dl></div>`;
+    };
+    out.innerHTML=card("Polymarket",poly,"poly")+card("Kalshi",kal,"kal")+card("No fees",none,"none");
+  }
+
   const setMode=m=>{S.mode=m;$("m-win").setAttribute("aria-pressed",m==="win");$("m-risk").setAttribute("aria-pressed",m==="risk");
     $("amt-l").textContent=m==="win"?"Amount to win":"Amount to risk";render()};
   $("m-win").addEventListener("click",()=>setMode("win"));
   $("m-risk").addEventListener("click",()=>setMode("risk"));
-  document.querySelectorAll("input").forEach(i=>i.addEventListener("input",render));
+  document.querySelectorAll("input").forEach(i=>i.addEventListener("input",()=>{render();renderSingle()}));
   $("k-l").textContent="Runs (whole number)";
-  setRateHint();render();
+  setRateHint();render();renderSingle();
 })();
 </script>
 
